@@ -1,5 +1,4 @@
-CREATE DATABASE college_event_management;
-USE college_event_management;
+
 
 CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
