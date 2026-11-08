@@ -1,3 +1,4 @@
+const bcrypt = require("bcryptjs");
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -64,8 +65,60 @@ app.use((err, req, res, next) => {
   });
 });
 
+async function fixDemoPasswordsOnce() {
+  if (process.env.FIX_DEMO_PASSWORDS !== "true") return;
+
+  const demoAccounts = [
+    {
+      email: "arun@example.com",
+      password: "password123",
+      role: "student"
+    },
+    {
+      email: "priya@example.com",
+      password: "password123",
+      role: "organizer"
+    },
+    {
+      email: "admin@example.com",
+      password: "admin123",
+      role: "admin"
+    }
+  ];
+
+  const promiseDb = db.promise();
+
+  for (const account of demoAccounts) {
+    const [users] = await promiseDb.query(
+      "SELECT user_id, role FROM users WHERE email = ?",
+      [account.email]
+    );
+
+    if (users.length !== 1 || users[0].role !== account.role) {
+      throw new Error(`Demo account missing or role mismatch: ${account.email}`);
+    }
+
+    const hashedPassword = await bcrypt.hash(account.password, 10);
+
+    await promiseDb.query(
+      "UPDATE users SET password = ? WHERE user_id = ?",
+      [hashedPassword, users[0].user_id]
+    );
+
+    console.log(`Updated demo password for ${account.email}`);
+  }
+
+  console.log("Demo account password repair completed.");
+}
+
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 College Event Management Server is running on port ${PORT}`);
+
+  try {
+    await fixDemoPasswordsOnce();
+  } catch (error) {
+    console.error("Demo password repair failed:", error.message);
+  }
 });
